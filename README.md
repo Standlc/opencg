@@ -1,3 +1,5 @@
+<img width="2784" height="1720" alt="Screenshot 2026-05-14 at 22 22 39" src="https://github.com/user-attachments/assets/54e2c2e9-0082-48b4-b144-9cd8d878041e" />
+
 # Rust Path Tracer
 
 A small CPU path tracer that opens an interactive window and progressively renders a 3D scene.
