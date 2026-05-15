@@ -78,7 +78,8 @@ fn run_viewer() -> Result<(), Box<dyn Error>> {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         // Reset accumulation any time the camera moves — otherwise old samples
         // would blend with new geometry and ghost.
-        if controller.update(&window) {
+        let camera_moving = controller.update(&window);
+        if camera_moving {
             camera = controller.camera();
             sample_count = 0;
             accumulation.fill(Color::ZERO);
@@ -90,6 +91,7 @@ fn run_viewer() -> Result<(), Box<dyn Error>> {
             sample_count,
             &mut accumulation,
             &mut framebuffer,
+            !camera_moving,
         );
         sample_count += 1;
 
@@ -118,7 +120,7 @@ fn render_image() -> Result<(), Box<dyn Error>> {
 
     for sample in 0..IMAGE_SAMPLES {
         eprintln!("image sample {}/{}", sample + 1, IMAGE_SAMPLES);
-        render_sample(&scene, &camera, sample, &mut accumulation, &mut framebuffer);
+        render_sample(&scene, &camera, sample, &mut accumulation, &mut framebuffer, true);
     }
 
     write_ppm(IMAGE_OUTPUT_FILE, &framebuffer)?;

@@ -279,12 +279,20 @@ fn glb_material(
         .as_f64()
         .unwrap_or(0.0);
 
-    // Treat anything with transmission, or sufficiently translucent BLEND, as glass.
-    let is_transmissive = transmission > 0.0 || (alpha_mode == "BLEND" && alpha_factor < 0.95);
-    if is_transmissive {
-        let ior = mat["extensions"]["KHR_materials_ior"]["ior"]
-            .as_f64()
-            .unwrap_or(1.5);
+    let has_transmission = transmission > 0.0;
+    let is_blend_alpha = alpha_mode == "BLEND" && alpha_factor < 0.95;
+    if has_transmission || is_blend_alpha {
+        // For true KHR_materials_transmission glass, use the authored IOR.
+        // For BLEND-alpha surfaces (windshields, tinted panels), these are
+        // typically flat translucent meshes, not real refractors — use a
+        // near-1 IOR so they stay transparent with minimal Fresnel reflection.
+        let ior = if has_transmission {
+            mat["extensions"]["KHR_materials_ior"]["ior"]
+                .as_f64()
+                .unwrap_or(1.5)
+        } else {
+            1.1
+        };
         return Material::dielectric(ior);
     }
 

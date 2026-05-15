@@ -18,10 +18,6 @@ pub const MAX_DEPTH: usize = 16;
 /// Bounce depth at which Russian-roulette termination starts kicking in.
 pub const RR_MIN_DEPTH: usize = 3;
 
-/// If false, the tracer only does direct light sampling (no indirect bounces).
-/// Mostly useful as a debugging toggle.
-pub const PATH_TRACING: bool = true;
-
 // --- Viewer camera controls ----------------------------------------------
 
 /// Yaw/pitch radians per pixel of mouse drag while orbiting.

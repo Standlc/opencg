@@ -7,7 +7,7 @@ use std::io::{BufWriter, Write};
 use rayon::prelude::*;
 
 use crate::camera::Camera;
-use crate::config::{IMAGE_HEIGHT, IMAGE_WIDTH, MAX_DEPTH, PATH_TRACING, RR_MIN_DEPTH};
+use crate::config::{IMAGE_HEIGHT, IMAGE_WIDTH, MAX_DEPTH, RR_MIN_DEPTH};
 use crate::geometry::Hit;
 use crate::material::Material;
 use crate::math::{color_to_u32_scaled, onb, Color, Interval, Ray};
@@ -22,6 +22,7 @@ pub fn render_sample(
     sample_count: usize,
     accumulation: &mut [Color],
     framebuffer: &mut [u32],
+    path_tracing: bool,
 ) {
     let scale = 1.0 / (sample_count + 1) as f64;
 
@@ -31,7 +32,7 @@ pub fn render_sample(
         .zip(framebuffer.par_chunks_mut(IMAGE_WIDTH))
         .enumerate()
         .for_each(|(y, (acc_row, fb_row))| {
-            render_row(scene, camera, sample_count, scale, y, acc_row, fb_row);
+            render_row(scene, camera, sample_count, scale, y, acc_row, fb_row, path_tracing);
         });
 }
 
@@ -46,6 +47,7 @@ pub fn render_row(
     y: usize,
     acc_row: &mut [Color],
     fb_row: &mut [u32],
+    path_tracing: bool,
 ) {
     for (x, (pixel, packed)) in acc_row.iter_mut().zip(fb_row.iter_mut()).enumerate() {
         // Each (x, y, sample) gets its own deterministic RNG stream.
@@ -53,7 +55,7 @@ pub fn render_row(
         // Jittered subpixel sampling for antialiasing.
         let u = (x as f64 + rng.next_f64()) / (IMAGE_WIDTH - 1) as f64;
         let v = 1.0 - (y as f64 + rng.next_f64()) / (IMAGE_HEIGHT - 1) as f64;
-        *pixel += trace(camera.ray(u, v), scene, MAX_DEPTH, &mut rng);
+        *pixel += trace(camera.ray(u, v), scene, MAX_DEPTH, &mut rng, path_tracing);
         *packed = color_to_u32_scaled(*pixel, scale);
     }
 }
@@ -64,7 +66,7 @@ pub fn render_row(
 /// directly (NEE) instead of waiting for the random walk to find them.
 /// Specular bounces still let emission accumulate naturally to avoid
 /// double-counting via NEE.
-pub fn trace(initial_ray: Ray, scene: &Scene, max_depth: usize, rng: &mut Rng) -> Color {
+pub fn trace(initial_ray: Ray, scene: &Scene, max_depth: usize, rng: &mut Rng, path_tracing: bool) -> Color {
     let mut ray = initial_ray;
     let mut throughput = Color::new(1.0, 1.0, 1.0);
     let mut color = Color::ZERO;
@@ -102,7 +104,10 @@ pub fn trace(initial_ray: Ray, scene: &Scene, max_depth: usize, rng: &mut Rng) -
                     throughput = throughput / survival;
                 }
 
-                if !PATH_TRACING {
+                // In DLS mode, stop after diffuse hits (DLS already handled
+                // direct lighting). Keep following specular bounces (glass,
+                // mirror) because they have no direct contribution themselves.
+                if !path_tracing && !hit.material.is_specular() {
                     return color;
                 }
                 ray = scattered;
